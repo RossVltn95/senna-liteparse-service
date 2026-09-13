@@ -12,26 +12,35 @@ dependencies stay out of the plugin zip.
 - `GET /health`
 - `POST /parse` with multipart field `file`
 - `POST /review-text` with JSON body `{ "text": "..." }`
+- `POST /match-job` with JSON body `{ "cvText": "...", "cvStructured": {}, "cvYears": 5, "job": {} }`
 
 `/parse` returns:
 
 ```json
 {
   "ok": true,
-  "parser": "liteparse+resume-parser-ats+pyresume",
+  "parser": "liteparse+resume-parser-ats+pyresume+layout",
   "text": "...",
   "totalPages": 2,
   "pages": [],
   "structured": {
-    "parser": "resume-parser-ats+pyresume",
+    "parser": "resume-parser-ats+pyresume+layout",
     "profile": {},
     "experience": [],
     "education": [],
     "skills": [],
     "parsers": [
       { "parser": "resume-parser-ats", "ok": true },
-      { "parser": "pyresume", "ok": true }
+      { "parser": "pyresume", "ok": true },
+      { "parser": "layout", "ok": true }
     ]
+  },
+  "canonical": {
+    "quality": { "mode": "structured", "score": 0.84 },
+    "experience": [],
+    "education": [],
+    "skills": [],
+    "rawFallbackSections": []
   }
 }
 ```
@@ -56,6 +65,28 @@ dependencies stay out of the plugin zip.
 }
 ```
 
+`/match-job` compares a parsed CV against a job description using
+`skill-extractor` plus deterministic seniority and experience-requirement
+checks. It returns:
+
+```json
+{
+  "ok": true,
+  "engine": "skill-extractor",
+  "fitScore": 79,
+  "fitBand": "strong",
+  "matchedSkills": ["recruitment", "payroll"],
+  "missingSkills": ["workday"],
+  "skillCoverageScore": 67,
+  "experienceRequirement": { "min": 5, "max": 5 },
+  "experienceFit": { "status": "qualified", "candidateYears": 10 }
+}
+```
+
+The skill classifier loads lazily on the first `/match-job` call. If the ONNX
+classifier cannot load, the service falls back to the package gazetteer
+candidates so Emily can still score skills without blocking the chat.
+
 ## Railway Variables
 
 - `CORS_ORIGIN=https://joinsenna.com`
@@ -66,8 +97,12 @@ dependencies stay out of the plugin zip.
 - `LITEPARSE_TIMEOUT_SECONDS=20`
 - `PYRESUME_ENABLED=1` optional, set `0` to disable the Python parser
 - `PYRESUME_TIMEOUT_MS=12000`
+- `LAYOUT_PARSE_ENABLED=1` optional, set `0` to disable the PyMuPDF layout parser
+- `LAYOUT_PARSE_TIMEOUT_MS=12000`
 - `HARPER_DIALECT=american` optional, supports `american`, `british`, `canadian`, `australian`
 - `HARPER_MAX_TEXT_LENGTH=20000`
+- `SKILL_EXTRACTOR_QUANTIZED=0` optional, set `1` to try the smaller quantized ONNX model
+- `SKILL_EXTRACTOR_TIMEOUT_MS=6500` optional timeout before falling back to deterministic skill candidates
 
 ## WordPress Variables
 
